@@ -146,6 +146,44 @@ def validate(val_loader, encoder, decoder, criterion,
         avg_bleu_4 = total_bleu_4 / total_step
         return avg_bleu_4
 
+def save_checkpoint(filename, encoder, decoder, optimizer, total_loss, epoch, train_step=1):
+    """Save the following to filename at checkpoints: encoder, decoder,
+    optimizer, total_loss, epoch, and train_step."""
+    torch.save({"encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "optimizer" : optimizer.state_dict(),
+                "total_loss": total_loss,
+                "epoch": epoch,
+                "train_step": train_step,
+               }, filename)
+
+def save_val_checkpoint(filename, encoder, decoder, total_loss,
+    total_bleu_4, epoch, val_step=1):
+    """Save the following to filename at checkpoints: encoder, decoder,
+    total_loss, total_bleu_4, epoch, and val_step"""
+    torch.save({"encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "total_loss": total_loss,
+                "total_bleu_4": total_bleu_4,
+                "epoch": epoch,
+                "val_step": val_step,
+               }, filename)
+
+def save_epoch(filename, encoder, decoder, optimizer, train_losses, val_losses, 
+               val_bleu, val_bleus, epoch):
+    """Save at the end of an epoch. Save the model's weights along with the 
+    entire history of train and validation losses and validation bleus up to 
+    now, and the best Bleu-4."""
+    torch.save({"encoder": encoder.state_dict(),
+                "decoder": decoder.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "train_losses": train_losses,
+                "val_losses": val_losses,
+                "val_bleu": val_bleu,
+                "val_bleus": val_bleus,
+                "epoch": epoch
+               }, filename)
+
 def early_stopping(val_bleus, patience=3):
     """Check if the validation Bleu-4 scores no longer improve for 3 
     (or a specified number of) consecutive epochs."""
