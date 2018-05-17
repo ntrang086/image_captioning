@@ -10,14 +10,22 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 # We set this at `100` to avoid clogging the notebook.
 PRINT_EVERY = 100
 
-def train(train_loader, encoder, decoder, criterion, optimizer, 
-          epoch, num_epochs, total_step, vocab_size):
-    """Train the model using the provided parameters.
-    Save the model, along with the optimizer, every 100 steps."""
+def train(train_loader, encoder, decoder, criterion, optimizer, vocab_size,
+          epoch, total_step, start_step=1, start_loss=0.0):
+    """Train the model for one epoch using the provided parameters. Save 
+    checkpoints every 100 steps. Return the epoch's average train loss."""
+
     # Switch to train mode
     encoder.train()
     decoder.train()
-    for i_step in range(1, total_step + 1):
+
+    # Keep track of train loss
+    total_loss = start_loss
+
+    # Start time for every 100 steps
+    start_train_time = time.time()
+
+    for i_step in range(start_step, total_step + 1):
         # Randomly sample a caption length, and sample indices with that length
         indices = train_loader.dataset.get_indices()
         # Create a batch sampler to retrieve a batch with the sampled indices
@@ -28,49 +36,43 @@ def train(train_loader, encoder, decoder, criterion, optimizer,
         for batch in train_loader:
             images, captions = batch[0], batch[1]
             break 
-
         # Move to GPU if CUDA is available
         if torch.cuda.is_available():
             images = images.cuda()
             captions = captions.cuda()
-
         # Pass the inputs through the CNN-RNN model
         features = encoder(images)
         outputs = decoder(features, captions)
 
         # Calculate the batch loss
         loss = criterion(outputs.view(-1, vocab_size), captions.view(-1))
-
         # Zero the gradients. Since the backward() function accumulates 
         # gradients, and we don’t want to mix up gradients between minibatches,
         # we have to zero them out at the start of a new minibatch
         optimizer.zero_grad()
-        
         # Backward pass to calculate the weight gradients
         loss.backward()
-
         # Update the parameters in the optimizer
         optimizer.step()
 
-        # Get training statistics
-        stats = "Epoch [%d/%d], Step [%d/%d], Train loss: %.4f, Train perplexity: %5.4f" % (epoch, num_epochs, 
-                 i_step, total_step, loss.item(), np.exp(loss.item()))
+        total_loss += loss.item()
 
+        # Get training statistics
+        stats = "Epoch %d, Train step [%d/%d], %ds, Loss: %.4f, Perplexity: %5.4f" \
+                % (epoch, i_step, total_step, time.time() - start_train_time,
+                   loss.item(), np.exp(loss.item()))
         # Print training statistics (on same line)
         print("\r" + stats, end="")
         sys.stdout.flush()
 
-        # Print training statistics (on different line)
+        # Print training stats (on different line), reset time and save checkpoint
         if i_step % PRINT_EVERY == 0:
             print("\r" + stats)
-            # Save the weights.
-            torch.save({"state_dict": encoder.state_dict(),
-                        "optimizer" : optimizer.state_dict(),
-                       }, os.path.join("./models", "encoder-{}{}.pkl".
-                                       format(epoch, i_step)))
-            torch.save({"state_dict": decoder.state_dict()
-                       }, os.path.join("./models", "decoder-{}{}.pkl".
-                                       format(epoch, i_step)))
+            filename = os.path.join("./models", "train-model-{}{}.pkl".format(epoch, i_step))
+            save_checkpoint(filename, encoder, decoder, optimizer, total_loss, epoch, i_step)
+            start_train_time = time.time()
+            
+    return total_loss / total_step
 
 def validate(val_loader, encoder, decoder, criterion,
              epoch, num_epochs, total_step, vocab):
@@ -235,7 +237,7 @@ def clean_sentence(word_idx_list, vocab):
     return sentence
 
 def get_prediction(data_loader, encoder, decoder, vocab):
-    """Loop over images in a test dataset and print model"s predicted caption."""
+    """Loop over images in a dataset and print model's predicted caption."""
     orig_image, image = next(iter(data_loader))
     plt.imshow(np.squeeze(orig_image))
     plt.title("Sample Image")
