@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import os
+import time
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 # Determine how often to print the batch loss while training/validating. 
@@ -73,23 +74,29 @@ def train(train_loader, encoder, decoder, criterion, optimizer, vocab_size,
             start_train_time = time.time()
             
     return total_loss / total_step
+            
+def validate(val_loader, encoder, decoder, criterion, vocab, epoch, 
+             total_step, start_step=1, start_loss=0.0, start_bleu=0.0):
+    """Validate the model for one epoch using the provided parameters. 
+    Return the epoch's average validation loss and Bleu-4 score."""
 
-def validate(val_loader, encoder, decoder, criterion,
-             epoch, num_epochs, total_step, vocab):
-    """Validate the model using the provided parameters."""
     # Switch to validation mode
     encoder.eval()
     decoder.eval()
 
-    # Initialize total Bleu-4 score, average validation bleu score and 
-    # smoothing function
-    total_bleu_4 = 0.0
-    avg_bleu_4 = 0.0
+    # Initialize smoothing function
     smoothing = SmoothingFunction()
+
+    # Keep track of validation loss and Bleu-4 score
+    total_loss = start_loss
+    total_bleu_4 = start_bleu
+
+    # Start time for every 100 steps
+    start_val_time = time.time()
 
     # Disable gradient calculation because we are in inference mode
     with torch.no_grad():
-        for i_step in range(1, total_step + 1):
+        for i_step in range(start_step, total_step + 1):
             # Randomly sample a caption length, and sample indices with that length
             indices = val_loader.dataset.get_indices()
             # Create a batch sampler to retrieve a batch with the sampled indices
@@ -132,21 +139,25 @@ def validate(val_loader, encoder, decoder, criterion,
 
             # Calculate the batch loss
             loss = criterion(outputs.view(-1, len(vocab)), captions.view(-1))
-
+            total_loss += loss.item()
+            
             # Get validation statistics
-            stats = "Epoch [%d/%d], Step [%d/%d], Val loss: %.4f, Val perplexity: %5.4f, Val Bleu-4: %.4f" % \
-                     (epoch, num_epochs, i_step, total_step, loss.item(), 
-                      np.exp(loss.item()), total_bleu_4 / i_step)
+            stats = "Epoch %d, Val step [%d/%d], %ds, Loss: %.4f, Perplexity: %5.4f, Bleu-4: %.4f" \
+                    % (epoch, i_step, total_step, time.time() - start_val_time,
+                       loss.item(), np.exp(loss.item()), batch_bleu_4 / len(outputs))
 
             # Print validation statistics (on same line)
             print("\r" + stats, end="")
             sys.stdout.flush()
 
-            # Print validation statistics (on different line)
+            # Print validation statistics (on different line) and reset time
             if i_step % PRINT_EVERY == 0:
                 print("\r" + stats)
-        avg_bleu_4 = total_bleu_4 / total_step
-        return avg_bleu_4
+                filename = os.path.join("./models", "val-model-{}{}.pkl".format(epoch, i_step))
+                save_val_checkpoint(filename, encoder, decoder, total_loss, total_bleu_4, epoch, i_step)
+                start_val_time = time.time()
+                
+        return total_loss / total_step, total_bleu_4 / total_step
 
 def save_checkpoint(filename, encoder, decoder, optimizer, total_loss, epoch, train_step=1):
     """Save the following to filename at checkpoints: encoder, decoder,
