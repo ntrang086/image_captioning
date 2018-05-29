@@ -20,28 +20,40 @@ The code can be categorized into two groups:
 * `3_Inference.ipynb`- Generates captions for test images.
 
 2) Helper files - Contain helper code for the notebooks:
-* `data_loader.py`- Creates the CoCoDataset and a DataLoader for it.
+* `data_loader.py`- Creates the `CoCoDataset` and a DataLoader for it.
+* `vocabulary.py` - Tokenizes captions and adds them to a dictionary of vocabulary. It is used as an instance variable of the `CoCoDataset`.
 * `model.py` - Provides the CNN and RNN models that are used by the notebooks to train and test data.
 
 ## Setup
 
-1) Clone the [COCO API repo](https://github.com/cocodataset/cocoapi) into *this project's directory*:
+1. Clone the [COCO API repo](https://github.com/cocodataset/cocoapi) into *this project's directory*:
 ```
 git clone https://github.com/cocodataset/cocoapi.git
 ```
 
-2) Setup (also described in the readme [here](https://github.com/cocodataset/cocoapi))
+2. Setup COCO API (also described in the readme [here](https://github.com/cocodataset/cocoapi)):
 ```
 cd cocoapi/PythonAPI
 make
 cd ..
 ```
 
-3) Others
+3. Install PyTorch (4.0 recommended) and torchvision.
+	
+	- __Linux__ or __Mac__: 
+	```
+	conda install pytorch torchvision -c pytorch 
+	```
+	- __Windows__: 
+	```
+	conda install -c peterjc123 pytorch-cpu
+	pip install torchvision
+	```
+
+4. Others:
 
 * Python 3
 * pycocotools
-* torch
 * nltk
 * numpy
 * scikit-image
