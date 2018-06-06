@@ -248,7 +248,8 @@ def clean_sentence(word_idx_list, vocab):
     return sentence
 
 def get_prediction(data_loader, encoder, decoder, vocab):
-    """Loop over images in a dataset and print model's predicted caption."""
+    """Loop over images in a dataset and print model's top three predicted 
+    captions using beam search."""
     orig_image, image = next(iter(data_loader))
     plt.imshow(np.squeeze(orig_image))
     plt.title("Sample Image")
@@ -256,6 +257,15 @@ def get_prediction(data_loader, encoder, decoder, vocab):
     if torch.cuda.is_available():
         image = image.cuda()
     features = encoder(image).unsqueeze(1)
+    print ("Caption without beam search:")
     output = decoder.sample(features)
     sentence = clean_sentence(output, vocab)
     print (sentence)
+
+    print ("Top captions using beam search:")
+    outputs = decoder.sample_beam_search(features)
+    # Print maximum the top 3 predictions
+    num_sents = min(len(outputs), 3)
+    for output in outputs[:num_sents]:
+        sentence = clean_sentence(output, vocab)
+        print (sentence)
